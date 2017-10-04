@@ -1,0 +1,150 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <!-- <link rel="icon" href="../../favicon.ico"> -->
+
+    <title>City of Calgary Open Data Downloader</title>
+
+    <!-- Bootstrap core CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css">
+    <script
+      src="https://code.jquery.com/jquery-3.2.1.min.js"
+      integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+      crossorigin="anonymous"></script>
+    <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+    <!-- Custom styles for this template -->
+    <!-- <link href="narrow-jumbotron.css" rel="stylesheet"> -->
+  </head>
+
+  <body>
+
+    <div class="container">
+      <div class="header clearfix">
+<!--         <nav>
+          <ul class="nav nav-pills float-right">
+            <li class="nav-item">
+              <a class="nav-link active" href="#">Home <span class="sr-only">(current)</span></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#">About</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#">Contact</a>
+            </li>
+          </ul>
+        </nav> -->
+        <h3 class="text-muted">Open Data Downloader</h3>
+      </div>
+
+      <div class="jumbotron">
+        <h1 class="display-3">Map-to-CSV Data Downloader</h1>
+        <p class="lead">Enter a map dataset URL or Socrata ID (4-by-4)</p>
+        <p><input id="fxf" type="text" class="form-control" value="https://data.calgary.ca/d/cje4-zd6c"></p>
+        <p><button id="prepper" class="btn btn-lg btn-warning" type="button" onclick="prepClick()" data-loading-text="<i class='fa fa-circle-o-notch fa-spin'></i> Processing!">Prep it for download!</button></p>                   
+        <!-- <p><button id="prepper" class="btn btn-lg btn-warning" type="button" data-loading-text="<i class='fa fa-circle-o-notch fa-spin'></i> Processing!"><i class='fa fa-circle-o-notch fa-spin'></i> Processing Order</button></p>                       -->
+        <p><a role="button" id="downloader" class="btn btn-lg btn-outline-danger invisible">Download it!</a></p>
+      </div>
+
+      <div class="row marketing">
+        <div class="col-lg-12">
+          <div class="input-group">
+            <!-- <span class="input-group-addon">URL or 4x4</span> -->
+            <!-- <input id="fxf" type="text" class="form-control" placeholder="https://data.calgary.ca/d/..."> -->
+            <span class="input-group-btn">
+              <!-- <button id="prepper" class="btn btn-lg btn-success" type="button">Prep it!</button> -->
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="row marketing">
+        <div class="col-lg-12">
+          <div class="input-group">
+            <!-- <input type="text" class="form-control" placeholder="https://data.calgary.ca/d/..."> -->
+            <span class="input-group-btn">
+              <!-- <a role="button" id="downloader" class="btn btn-lg btn-danger">Download it!</a> -->
+            </span>
+          </div>
+        <div>
+      </div>
+
+      </div>
+
+      <script type="text/javascript">
+
+      // $('#prepper').on('click', function() {
+      // })
+
+      function prepClick() {
+
+        var thebtn = $('#prepper');
+        thebtn.html("<i class='fa fa-circle-o-notch fa-spin'></i> Processing!");
+
+        var fxf = $('#fxf').val();
+        var fx4Finder = new RegExp('([a-z0-9]{4}-[a-z0-9]{4})[.]*$')
+        console.log(fx4Finder.exec(fxf)[0])
+        var dataset4x4 = (fxf.length === 9 ? fxf : fx4Finder.exec(fxf)[0]);
+
+        //MAKE AN EXCEPTION HANDLER THAT CHANGES DOWNLOAD BUTTON?
+        // if ()
+        prepper(dataset4x4);
+      }
+
+      function prepper(dataset4x4) {
+
+        $.ajax({
+          // url: "https://data.calgary.ca/api/views/cje4-zd6c.json" // The MAP
+          url: "https://data.calgary.ca/api/views/" + dataset4x4 + ".json", // The DATA underlying
+          // url: "https://data.calgary.ca/api/views/mndt-3a4i/rows.json" // The DATA underlying
+          // url: "https://data.calgary.ca/api/views/dmrk-q4ck.json" // Just a dataset
+          method: "GET",
+          data: {
+            "$$app_token": "uNdpqzfYLLjyEbw4x3ef8oBuI"
+          }
+        })
+          .done(function( data , textStatus, request) {
+            if ( console && console.log ) {
+              // console.log(textStatus)
+              // console.log( data );
+              // Maps: map ; Mapdataset: geoRows; dataset: table
+              if (data.displayType === 'map') {
+                prepper(data.metadata.geo.layers);
+              }
+
+              if (data.displayType === 'geoRows' | data.displayType === 'table') {
+                var columns = data.columns.map(function(d) {
+                    return d.fieldName;
+                })
+
+                var index = columns.indexOf('the_geom');
+                if (index !== -1) {
+                    columns.splice(index, 1);
+                }
+                downloader(columns, data.id)
+              }
+
+            }
+          });
+        }
+
+        function downloader(columns, id) {
+          var columnQuery = columns.join();
+          var url = "https://data.calgary.ca/resource/"+ id +".csv?$select=" + columnQuery;
+          $('#downloader').toggleClass('btn-outline-danger btn-success invisible')
+          $('#downloader').attr('href', url)
+          var thebtn = $('#prepper');
+          thebtn.html("Prep it for download!");
+          thebtn.toggleClass('btn-outline-warning btn-warning')
+          // $('#prepper').toggleClass('btn-outline-warning btn-warning')
+        }
+
+      </script>
+
+    </div> <!-- /container -->
+  </body>
+</html>
